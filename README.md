@@ -34,6 +34,14 @@ A simple Nostr-based chat application where users can join channels, send messag
    http://localhost:5173
    ```
 
+#### Build (optional)
+
+```bash
+npm run build
+```
+
+Serve the dist folder
+
 ## Scripts
 
 - **`npm run dev`**: Start the development server.

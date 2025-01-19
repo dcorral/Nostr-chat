@@ -27,8 +27,14 @@ function signEvent(
 }
 
 function ChatRoom(props: { privKey: string; pubKey: string }) {
+  const generateRandomRoom = () =>
+    Array.from(crypto.getRandomValues(new Uint8Array(12)))
+      .map((b) => b.toString(36).padStart(2, "0"))
+      .join("")
+      .slice(0, 12);
+
   const { privKey, pubKey } = props;
-  const [room, setRoom] = useState("my-channel");
+  const [room, setRoom] = useState(generateRandomRoom());
   const [relay, setRelay] = useState<Relay | null>(null);
   const [messages, setMessages] = useState<Event[]>([]);
   const [newMessage, setNewMessage] = useState("");

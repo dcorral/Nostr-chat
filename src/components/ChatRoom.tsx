@@ -62,7 +62,9 @@ function ChatRoom(props: { privKey: string; pubKey: string }) {
             onevent: (evt) => {
               if (!seenIdsRef.current.has(evt.id)) {
                 seenIdsRef.current.add(evt.id);
-                setMessages((old) => [evt, ...old]);
+                setMessages((old) =>
+                  [...old, evt].sort((a, b) => b.created_at - a.created_at),
+                );
               }
             },
           },
@@ -94,6 +96,8 @@ function ChatRoom(props: { privKey: string; pubKey: string }) {
 
   function sendMessage() {
     if (!relay || !privKey) return;
+    if (!newMessage || newMessage === "") return;
+
     const now = Math.floor(Date.now() / 1000);
     const baseEvent = {
       kind: 1,
@@ -123,7 +127,7 @@ function ChatRoom(props: { privKey: string; pubKey: string }) {
         type="text"
         value={room}
         onChange={(e) => setRoom(e.target.value)}
-        disabled={!isConnected} // Disable when relay is disconnected
+        disabled={!isConnected}
       />
       <br />
       <br />
@@ -132,7 +136,7 @@ function ChatRoom(props: { privKey: string; pubKey: string }) {
         placeholder="Write a message"
         value={newMessage}
         onChange={(e) => setNewMessage(e.target.value)}
-        disabled={!isConnected} // Disable when relay is disconnected
+        disabled={!isConnected}
       />
       <button onClick={sendMessage} disabled={!isConnected}>
         Send

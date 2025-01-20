@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Event, Relay } from "nostr-tools";
+import { Event, Relay, nip44 } from "nostr-tools";
 import * as secp from "@noble/secp256k1";
 import { schnorr } from "@noble/curves/secp256k1";
 import { sha256 } from "@noble/hashes/sha256";
@@ -26,15 +26,12 @@ function signEvent(
   return schnorr.sign(idBytes, skBytes);
 }
 
-function ChatRoom(props: { privKey: string; pubKey: string }) {
-  const generateRandomRoom = () =>
-    Array.from(crypto.getRandomValues(new Uint8Array(12)))
-      .map((b) => b.toString(36).padStart(2, "0"))
-      .join("")
-      .slice(0, 12);
-
-  const { privKey, pubKey } = props;
-  const [room, setRoom] = useState(generateRandomRoom());
+function ChatRoom(props: {
+  privKey: string;
+  pubKey: string;
+  recipientPubKey: string;
+}) {
+  const { privKey, pubKey, recipientPubKey } = props;
   const [relay, setRelay] = useState<Relay | null>(null);
   const [messages, setMessages] = useState<Event[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -53,18 +50,45 @@ function ChatRoom(props: { privKey: string; pubKey: string }) {
         r.subscribe(
           [
             {
-              kinds: [1],
-              "#r": [room],
+              kinds: [4],
+              "#p": [pubKey, recipientPubKey],
               limit: 50,
             },
           ],
           {
-            onevent: (evt) => {
+            onevent: async (evt) => {
               if (!seenIdsRef.current.has(evt.id)) {
                 seenIdsRef.current.add(evt.id);
-                setMessages((old) =>
-                  [...old, evt].sort((a, b) => b.created_at - a.created_at),
-                );
+
+                const senderPubKey = evt.tags.find(([k]) => k === "p")?.[1];
+                console.log(senderPubKey);
+                if (!senderPubKey) return;
+
+                try {
+                  const conversationKey =
+                    senderPubKey === pubKey
+                      ? nip44.getConversationKey(
+                          secp.etc.hexToBytes(privKey),
+                          recipientPubKey,
+                        )
+                      : nip44.getConversationKey(
+                          secp.etc.hexToBytes(privKey),
+                          senderPubKey,
+                        );
+                  const plaintext = nip44.decrypt(evt.content, conversationKey);
+                  console.log(plaintext);
+                  setMessages((old) =>
+                    [
+                      {
+                        ...evt,
+                        content: plaintext,
+                      },
+                      ...old,
+                    ].sort((a, b) => b.created_at - a.created_at),
+                  );
+                } catch (err) {
+                  console.error("Failed to decrypt message:", err);
+                }
               }
             },
           },
@@ -92,44 +116,48 @@ function ChatRoom(props: { privKey: string; pubKey: string }) {
         relay.close();
       }
     };
-  }, [room]);
+  }, []);
 
-  function sendMessage() {
-    if (!relay || !privKey) return;
-    if (!newMessage || newMessage === "") return;
+  async function sendMessage() {
+    if (!relay || !privKey || !newMessage || newMessage === "") return;
 
-    const now = Math.floor(Date.now() / 1000);
-    const baseEvent = {
-      kind: 1,
-      pubkey: pubKey,
-      created_at: now,
-      tags: [["r", room]],
-      content: newMessage,
-    };
-    const id = getEventHash(baseEvent);
-    const sig = signEvent({ ...baseEvent, id }, privKey);
-    relay.publish({
-      ...baseEvent,
-      id,
-      sig: secp.etc.bytesToHex(sig),
-    });
-    setNewMessage("");
+    try {
+      const conversationKey = nip44.getConversationKey(
+        secp.etc.hexToBytes(privKey),
+        recipientPubKey,
+      );
+      const ciphertext = nip44.encrypt(newMessage, conversationKey);
+
+      const now = Math.floor(Date.now() / 1000);
+      const baseEvent = {
+        kind: 4,
+        pubkey: pubKey,
+        created_at: now,
+        tags: [["p", recipientPubKey]], // Tag the recipient
+        content: ciphertext,
+      };
+      const id = getEventHash(baseEvent);
+      const sig = signEvent({ ...baseEvent, id }, privKey);
+
+      const event: Event = {
+        ...baseEvent,
+        id,
+        sig: secp.etc.bytesToHex(sig),
+      };
+      relay.publish(event);
+
+      setNewMessage("");
+    } catch (err) {
+      console.error("Failed to encrypt message:", err);
+    }
   }
 
   return (
     <div>
-      <h3>Nostr Chat Room</h3>
+      <h3>Direct Message</h3>
       {!isConnected && (
         <p style={{ color: "red" }}>Relay is disconnected. Please reconnect.</p>
       )}
-      <label>Room: </label>
-      <input
-        type="text"
-        value={room}
-        onChange={(e) => setRoom(e.target.value)}
-        disabled={!isConnected}
-      />
-      <br />
       <br />
       <input
         type="text"

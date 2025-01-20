@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useState } from "react";
 import ConnectWallet from "./components/ConnectWallet";
 import ChatRoom from "./components/ChatRoom";
@@ -6,6 +5,7 @@ import ChatRoom from "./components/ChatRoom";
 function App() {
   const [privKey, setPrivKey] = useState("");
   const [pubKey, setPubKey] = useState("");
+  const [recipientPubKey, setRecipientPubKey] = useState("");
 
   return (
     <div>
@@ -14,8 +14,17 @@ function App() {
           setPrivKey(pKey);
           setPubKey(uKey);
         }}
+        onRecipientPubKey={(rPubKey: string) => {
+          setRecipientPubKey(rPubKey);
+        }}
       />
-      {privKey && pubKey && <ChatRoom privKey={privKey} pubKey={pubKey} />}
+      {privKey && pubKey && recipientPubKey && (
+        <ChatRoom
+          privKey={privKey}
+          pubKey={pubKey}
+          recipientPubKey={recipientPubKey}
+        />
+      )}
     </div>
   );
 }

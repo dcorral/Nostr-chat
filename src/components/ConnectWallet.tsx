@@ -3,9 +3,11 @@ import { schnorr } from "@noble/curves/secp256k1";
 
 function ConnectWallet(props: {
   onKeys: (privHex: string, pubHex: string) => void;
+  onRecipientPubKey: (recipientPubKey: string) => void;
 }) {
   const [privKeyHex, setPrivKeyHex] = useState("");
   const [pubKeyHex, setPubKeyHex] = useState("");
+  const [recipientPubKey, setRecipientPubKey] = useState("");
 
   function bytesToHex(bytes: Uint8Array) {
     return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
@@ -51,6 +53,12 @@ function ConnectWallet(props: {
     }
   }
 
+  function handleRecipientPubKeyChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const keyHex = e.target.value.trim();
+    setRecipientPubKey(keyHex);
+    props.onRecipientPubKey(keyHex);
+  }
+
   return (
     <div>
       <h3>Connect Wallet</h3>
@@ -65,6 +73,14 @@ function ConnectWallet(props: {
         placeholder="Paste a 64-char hex private key"
         value={privKeyHex}
         onChange={handleImport}
+      />
+      <br />
+      <h3>Enter recipient's public key</h3>
+      <input
+        type="text"
+        placeholder="Recipient's public key (hex)"
+        value={recipientPubKey}
+        onChange={handleRecipientPubKeyChange}
       />
     </div>
   );
